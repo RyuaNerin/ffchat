@@ -195,10 +195,10 @@ namespace App
                         switch (indexCode)
                         {
                             case 0xDC: i = 4; break; // 부대
-                            case 0xF9: i = 1; break; // 파티
+                            case 0xF9: i = 6; break; // 파티
                         }
                         if (mine)
-                            AddChat(i, "-",                  GetString(message, 40));
+                            AddChat(i, "-",                    GetString(message, 40));
                         else
                             AddChat(i, GetString(message, 53), GetString(message, 85));
                     }
