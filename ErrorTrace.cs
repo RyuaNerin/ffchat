@@ -13,8 +13,9 @@ namespace RyuaNerin
 
         static ErrorTrace()
         {
-            AppDomain.CurrentDomain.UnhandledException += (s, e) => ShowCrashReport((Exception)e.ExceptionObject);
-            System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, e) => ShowCrashReport(e.Exception);
+            System.AppDomain.CurrentDomain.UnhandledException               += (s, e) => ShowCrashReport((Exception)e.ExceptionObject);
+            System.Threading.Tasks.TaskScheduler.UnobservedTaskException    += (s, e) => ShowCrashReport(e.Exception);
+            System.Windows.Application.Current.DispatcherUnhandledException += (s, e) => ShowCrashReport(e.Exception);
 
             var asm = Assembly.GetExecutingAssembly();
             Version = asm.GetName().Version.ToString();

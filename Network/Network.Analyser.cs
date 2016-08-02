@@ -3,13 +3,13 @@
 using System;
 using System.IO;
 using System.IO.Compression;
-using System.Text;
+using FFChat;
 
 namespace App
 {
     partial class Network
     {
-        private void AnalyseFFXIVPacket(byte[] payload)
+        private void AnalyseFFXIVPacket(byte[] payload, bool sendMessage)
         {
             try
             {
@@ -76,7 +76,7 @@ namespace App
                                     messages.Seek(-4, SeekOrigin.Current);
                                     messages.Read(message, 0, messageLength);
 
-                                    HandleMessage(message);
+                                    Worker.HandleMessage(message, sendMessage);
                                 }
                                 catch (Exception ex)
                                 {
@@ -111,7 +111,7 @@ namespace App
                                 Buffer.BlockCopy(payload, offset, buff, 0, buff.Length);
                                 payload = buff;
 
-                                AnalyseFFXIVPacket(payload);
+                                AnalyseFFXIVPacket(payload, sendMessage);
                                 break;
                             }
                         }
@@ -125,128 +125,6 @@ namespace App
                 Console.WriteLine("패킷 처리중 에러 발생함");
                 Console.WriteLine(ex);
             }
-        }
-
-        private static string[] IndexNames =
-        {
-            "말하기",      "떠들기",
-            "외치기",      "귓속말",
-            "자유부대",    "파티",
-            "연합파티",
-            "링크셸1", "링크셸2",
-            "링크셸3", "링크셸4",
-            "링크셸5", "링크셸6",
-            "링크셸7", "링크셸8"
-        };
-        private void HandleMessage(byte[] message)
-        {
-            try
-            {
-                if (message.Length < 32)
-                {
-                    // type == 0x0000 이였던 메시지는 여기서 걸러짐
-                    return;
-                }
-                
-                var opcode = BitConverter.ToUInt16(message, 18);
-
-                //Console.WriteLine(BitConverter.ToString(message));
-
-                // 64 귓속말
-                // 65 자유부대
-                // 67 외치기
-
-                if (opcode == 0x64 || opcode == 0x65 || opcode == 0x67)
-                {
-                    bool mine = message[0] != 0x58;
-
-                    int indexCode = message[32];
-
-                    int i = 0;
-                    // 말하기 떠들기 외치기
-                    if (opcode == 0x67)
-                    {
-                        if (mine)
-                            indexCode = message[56];
-
-                        switch (indexCode)
-                        {
-                            case 0x0A: i = 0; break; // 말하기
-                            case 0x1E: i = 1; break; // 떠들기
-                            case 0x0B: i = 2; break; // 외치기
-                        }
-
-                        if (mine)
-                            AddChat(i, "-", GetString(message, 58));
-                        else
-                            AddChat(i, GetString(message, 52), GetString(message, 84));
-                    }
-                    // 귓속말
-                    else if (opcode == 0x64)
-                    {
-                        if (mine)
-                            AddChat(3, string.Format(">>{0}: {1}", GetString(message, 33), GetString(message, 65)));
-                        else
-                            AddChat(3, string.Format("{0} >> {1}", GetString(message, 41), GetString(message, 73)));
-                    }
-                    // 부대 / 파티
-                    else if (opcode == 0x65)
-                    {
-                        switch (indexCode)
-                        {
-                            case 0xDC: i = 4; break; // 부대
-                            case 0xF9: i = 6; break; // 파티
-                        }
-                        if (mine)
-                            AddChat(i, "-",                    GetString(message, 40));
-                        else
-                            AddChat(i, GetString(message, 53), GetString(message, 85));
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("패킷 처리중 에러 발생함");
-                Console.WriteLine(ex);
-            }
-        }
-
-        private void AddChat(int index, string name, string text)
-        {
-            if (text == null)
-                return;
-
-            var sb = new StringBuilder(256);
-            sb.Append(DateTime.Now.ToString("[HH:mm] "));
-            sb.Append('[');
-            sb.Append(IndexNames[index]);
-            sb.Append("] ");
-            sb.Append('<');
-            sb.Append(name);
-            sb.Append("> ");
-            sb.Append(text);
-
-            FFChat.frmMain.Instance.AddChat(index, sb.ToString());
-        }
-
-        private void AddChat(int index, string str)
-        {
-            var sb = new StringBuilder(256);
-            sb.Append(DateTime.Now.ToString("[HH:mm] "));
-            sb.Append(str);
-
-            FFChat.frmMain.Instance.AddChat(index, sb.ToString());
-        }
-
-        private string GetString(byte[] bytes, int index)
-        {
-            int pos = index;
-            while (bytes[pos++] != 0 && pos < bytes.Length);
-
-            if (index == pos - 1)
-                return null;
-
-            return Encoding.UTF8.GetString(bytes, index, pos - index - 1);
         }
     }
 }

@@ -228,21 +228,21 @@ namespace App
                     // 성능 문제로 연결 종료 즉시 중단 체크를 건너 뜀
                     // (어차피 30초마다 MainForm.cs::MainForm_Load에서 실행된 Task에서 체크하므로)
 
+                    // 받는 패킷이 아님
                     if (!connections.Contains(reverseConnection))
                     {
                         lock (lockAnalyse)
                         {
-                            AnalyseFFXIVPacket(tcpPacket.Payload);
+                            AnalyseFFXIVPacket(tcpPacket.Payload, true);
                         }
 
-                        // 받는 패킷이 아님
                         return;
                     }
 
                     // 파판 서버에서 오는 패킷이니 분석함
                     lock (lockAnalyse)
                     {
-                        AnalyseFFXIVPacket(tcpPacket.Payload);
+                        AnalyseFFXIVPacket(tcpPacket.Payload, false);
                     }
                 }
             }
