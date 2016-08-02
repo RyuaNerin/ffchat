@@ -14,6 +14,7 @@ namespace FFChat
     internal static class Worker
     {
         private const int MaxLog = 512;
+        private const string MyName = "내 캐릭터";
 
         public static readonly ObservableCollection<string> ProcessList = new ObservableCollection<string>();
         public static readonly ObservableCollection<Chat> ChatLog = new ObservableCollection<Chat>();
@@ -156,20 +157,21 @@ namespace FFChat
             "파티",
             "연합파티",
             "자유부대",
-            "링크셸1",
-            "링크셸2",
-            "링크셸3",
-            "링크셸4",
-            "링크셸5",
-            "링크셸6",
-            "링크셸7",
-            "링크셸8"
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8"
         };
 
-        private const string Format_67   = "[{0:00}:{1:00}] {2}: {3}";
-        private const string Format_64_S = "[{0:00}:{1:00}] >>{2}: {3}";
-        private const string Format_64_R = "[{0:00}:{1:00}] {2} >> {3}";
-        private const string Format_65   = "[{0:00}:{1:00}] [{4}] <{2}> {3}";
+        private const string Format_Say    = "[{0:00}:{1:00}] {2}: {3}";
+        private const string Format_Tell_S = "[{0:00}:{1:00}] >>{2}: {3}";
+        private const string Format_Tell_R = "[{0:00}:{1:00}] {2} >> {3}";
+        private const string Format_Party  = "[{0:00}:{1:00}] ({2}) {3}";
+        private const string Format_Guild  = "[{0:00}:{1:00}] [{4}] <{2}> {3}";
 
         public static void HandleMessage(byte[] message, bool sendMessage)
         {
@@ -177,9 +179,10 @@ namespace FFChat
             {
                 if (message.Length < 1000)
                     return;
-
-
+                
+#if DEBUG
                 Console.WriteLine(BitConverter.ToString(message).Replace("-", " "));
+#endif
 
                 // 64 귓속말
                 // 65 자유부대
@@ -196,6 +199,8 @@ namespace FFChat
 
                     int type = 0;
 
+                    DateTime date = DateTime.Now;
+
                     #region 말하기 떠들기 외치기
                     if (opcode == 0x67)
                     {
@@ -209,11 +214,13 @@ namespace FFChat
                             case 0x0B: type = 2; break; // 외치기
                         }
                         if (!ShowingTypes[type]) return;
+                        
+                        date = new DateTime(1970, 1, 1, 0, 0, 0).AddSeconds(BitConverter.ToUInt32(message, 24)).ToLocalTime();
 
-                        fmt  = Format_67;
+                        fmt  = Format_Say;
                         if (sendMessage)
                         {
-                            name = "-";
+                            name = MyName;
                             body = GetString(message, 58);
                         }
                         else
@@ -232,13 +239,13 @@ namespace FFChat
 
                         if (sendMessage)
                         {
-                            fmt  = Format_64_S;
+                            fmt  = Format_Tell_S;
                             name = GetString(message, 33);
                             body = GetString(message, 65);
                         }
                         else
                         {
-                            fmt  = Format_64_R;
+                            fmt  = Format_Tell_R;
                             name = GetString(message, 41);
                             body = GetString(message, 73);
                         }
@@ -248,18 +255,28 @@ namespace FFChat
                     #region 부대 / 파티
                     else if (opcode == 0x65)
                     {
+                        fmt = Format_Guild;
+
                         switch (indexCode)
                         {
-                            case 0xDC: type = 6; break; // 부대
-                            case 0xF9: type = 4; break; // 파티
-                            case 0x78: type = 7; break; // 링1
+                            case 0x7A:
+                            case 0xF9: fmt = Format_Party;
+                                       type = 4;  break; // 파티
+                            case 0xDC: type = 6;  break; // 부대
+                            case 0x78: type = 7;  break; // 링1
+                            case 0x7E: type = 8;  break; // 링2
+                            case 0x81: type = 9;  break; // 링3
+                            case 0x82: type = 10; break; // 링4
+                            case 0x83: type = 11; break; // 링5
+                            case 0x84: type = 12; break; // 링6
+                            case 0x85: type = 13; break; // 링7
+                            case 0x86: type = 14; break; // 링8
                         }
                         if (!ShowingTypes[type]) return;
 
-                        fmt = Format_65;
                         if (sendMessage)
                         {
-                            name = "-";
+                            name = MyName;
                             body = GetString(message, 40);
                         }
                         else
@@ -273,7 +290,6 @@ namespace FFChat
                     if (string.IsNullOrWhiteSpace(body))
                         return;
 
-                    var date = DateTime.Now;
                     FFChatApp.Current.Dispatcher.Invoke(new Action<Chat>(AddChatPriv), new Chat(type, string.Format(fmt, date.Hour, date.Minute, name, body, TypeNames[type])));
                 }
             }
