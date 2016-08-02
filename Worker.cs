@@ -179,11 +179,12 @@ namespace FFChat
             {
                 if (message.Length < 1000)
                     return;
-                
+
 #if DEBUG
                 Console.WriteLine(BitConverter.ToString(message).Replace("-", " "));
 #endif
 
+                // 47 인던 파티
                 // 64 귓속말
                 // 65 자유부대
                 // 67 외치기
@@ -260,6 +261,9 @@ namespace FFChat
                         switch (indexCode)
                         {
                             case 0x7A:
+                            case 0xA4:
+                            case 0xCD:
+                            case 0xE5:
                             case 0xF9: fmt = Format_Party;
                                        type = 4;  break; // 파티
                             case 0xDC: type = 6;  break; // 부대
