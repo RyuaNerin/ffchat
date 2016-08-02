@@ -260,12 +260,14 @@ namespace FFChat
 
                         switch (indexCode)
                         {
+                            /*
                             case 0x7A:
                             case 0xA4:
                             case 0xCD:
                             case 0xE5:
                             case 0xF9: fmt = Format_Party;
                                        type = 4;  break; // 파티
+                            */
                             case 0xDC: type = 6;  break; // 부대
                             case 0x78: type = 7;  break; // 링1
                             case 0x7E: type = 8;  break; // 링2
@@ -275,6 +277,10 @@ namespace FFChat
                             case 0x84: type = 12; break; // 링6
                             case 0x85: type = 13; break; // 링7
                             case 0x86: type = 14; break; // 링8
+                            default:
+                                fmt = Format_Party;
+                                type = 4;
+                                break;
                         }
                         if (!ShowingTypes[type]) return;
 
