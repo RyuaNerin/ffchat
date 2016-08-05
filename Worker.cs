@@ -327,7 +327,7 @@ namespace FFChat
         private readonly static string HQChar = Encoding.UTF8.GetString(new byte[] { 0xEE, 0x80, 0xBC });
         private static string GetString(byte[] raw, int index)
         {
-            #region ========== 분석 ==========
+            #region ========== 삽질의 흔적 ==========
             // 아이템 링크
             // NQ ==========
             // 0  1  2  3  4  5  6  7  8  9  10 11 12 13
@@ -484,10 +484,25 @@ namespace FFChat
                                 arrPos += bytes.Length;
                                 arr[arrPos++] = 0x3C; // >
                             }
-
-                            rawPos += 2 + v;
-                            continue;
+                            else
+                            {
+                                arr[arrPos++] = 0x3E; // <
+                                arr[arrPos++] = 0x3F; //?
+                                arr[arrPos++] = 0x3F; //?
+                                arr[arrPos++] = 0x3F; //?
+                                arr[arrPos++] = 0x3C; // >
+                            }
                         }
+                        else
+                        {
+                            arr[arrPos++] = 0x3E; // <
+                            arr[arrPos++] = 0x3F; //?
+                            arr[arrPos++] = 0x3F; //?
+                            arr[arrPos++] = 0x3F; //?
+                            arr[arrPos++] = 0x3C; // >
+                        }
+
+                        rawPos += 2 + v;
                     }
                     else
                     {
@@ -515,9 +530,9 @@ namespace FFChat
                                 break;
 
                             case 0x07:
-                                arr[arrPos++] = 63; //?
-                                arr[arrPos++] = 63; //?
-                                arr[arrPos++] = 63; //?
+                                arr[arrPos++] = 0x3F; //?
+                                arr[arrPos++] = 0x3F; //?
+                                arr[arrPos++] = 0x3F; //?
 
                                 rawPos += 5;
                                 break;
