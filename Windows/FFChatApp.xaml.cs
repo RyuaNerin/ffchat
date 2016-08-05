@@ -15,6 +15,8 @@ namespace FFChat.Windows
             RyuaNerin.ErrorTrace.Load();
 
             Console.SetOut(m_out = new StreamWriter("ffchat.log", true, Encoding.UTF8));
+
+            FFData.Load();
         }
         
         private void Application_Exit(object sender, ExitEventArgs e)

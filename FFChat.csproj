@@ -72,6 +72,24 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FFData\action.cs" />
+    <Compile Include="FFData\companion.cs" />
+    <Compile Include="FFData\race.cs" />
+    <Compile Include="FFData\textcommand.cs" />
+    <Compile Include="FFData\petaction.cs" />
+    <Compile Include="FFData\buddyaction.cs" />
+    <Compile Include="FFData\generalaction.cs" />
+    <Compile Include="FFData\craftaction.cs" />
+    <Compile Include="FFData\guardiandeity.cs" />
+    <Compile Include="FFData\maincommand.cs" />
+    <Compile Include="FFData\weather.cs" />
+    <Compile Include="FFData\tribe.cs" />
+    <Compile Include="FFData\classjob.cs" />
+    <Compile Include="FFData\mount.cs" />
+    <Compile Include="FFData\completion.cs" />
+    <Compile Include="FFData\__.cs" />
+    <Compile Include="FFData\pet.cs" />
+    <Compile Include="FFData\placename.cs" />
     <Compile Include="RyuaNerin\LastestRelease.cs" />
     <Compile Include="Windows\FFChatApp.xaml.cs">
       <DependentUpon>FFChatApp.xaml</DependentUpon>

@@ -327,6 +327,7 @@ namespace FFChat
         private readonly static string HQChar = Encoding.UTF8.GetString(new byte[] { 0xEE, 0x80, 0xBC });
         private static string GetString(byte[] raw, int index)
         {
+            #region ========== 분석 ==========
             // 아이템 링크
             // NQ ==========
             // 0  1  2  3  4  5  6  7  8  9  10 11 12 13
@@ -379,19 +380,69 @@ namespace FFChat
             // 02 2E 0E C9 04 81 0C FE FF FF 52 E8 F6 02 D9 40 03           // 림사 로민사 상층 갑판 (10,14)
             // 02 2E 0C C9 04 81 0C F2 8F 11 F6 02 27 84 03                 // 림사 로민사 상층 갑판 (11,14)
             //
+            // 상용구
+            // 0  1  2  3  4  5 
+            // 02 2E 03 ?? __ 03            (__ = +1)
+            // 02 2E 03 3C 05 03            weather.exh_ko        4 04 안개
+            // 02 2E 03 3C 06 03            weather.exh_ko        5 05 바람
+            // 02 2E 03 3C 07 03            weather.exh_ko        6 06 강풍
+            // 02 2E 03 02 CC 03            completion.exh_ko   203 CB 안녕하세요.
+            // 02 2E 03 01 66 03            completion.exh_ko   101 65 상용구 사전을 사용해주세요.
+            // 02 2E 03 38 B0 03            action.exh_ko       175 AF 눈에는 눈
+            // 02 2E 03 38 0F 03            action.exh_ko        14 0E 플래시
+            // 02 2E 03 34 05 03            race.exh_ko           4 04 미코테
+            // 0  1  2  3  4  5  6
+            // 02 2E 04 ?? F0 __ 03
+            // 02 2E 04 38 F0 EF 03         239 EF 왕의 수익
+            // 02 2E 04 38 F0 F1 03         241 F1 왕의 수익
+            // 0  1  2  3  4  5  6  7
+            // 02 2E 05 ?? F2 __ __ 03
+            // 02 2E 05 17 F2 07 70 03      completion.exh_ko   1904 07 70 가루다
+            // 02 2E 05 18 F2 08 0B 03      completion.exh_ko   2059 08 0B 가루다 토벌전
+            // 02 2E 05 18 F2 08 55 03      completion.exh_ko   2133 08 55 진 비스마르크 토벌전
+            // 02 2E 05 38 F2 0E 01 03      action.exh_ko       3585 0E 01 전개전술
+            // 0  1  2  3  4  5  6  7  8
+            // 02 2E 06 ?? F6 __ __ __ 03
+            // 02 2E 06 39 F6 01 86 A9 03   100009 01 86 A9 비레고의 축복
+            //
+            // 상용구 테이블
+            // 01 01 : completion.exh_ko
+            // 25 19 : completion.exh_ko
+            // 49 31 : mount.exh_ko
+            // 50 32 : classjob.exh_ko
+            // 51 33 : placename.exh_ko
+            // 52 34 : race.exh_ko
+            // 53 35 : tribe.exh_ko
+            // 54 36 : guardiandeity.exh_ko
+            // 55 37 : generalaction.exh_ko
+            // 56 38 : action.exh_ko
+            // 57 39 : craftaction.exh_ko
+            // 58 3A : buddyaction.exh_ko
+            // 59 3B : petaction.exh_ko
+            // 60 3C : weather.exh_ko
+            // 61 3D : maincommand.exh_ko
+            // 62 3E : textcommand.exh_ko
+            // 63 3F : action.exh_ko
+            // 64 40 : pet.exh_ko
+            // 65 41 : companion.exh_ko
+            //
             // 정리
             // 0  1  2  3  4  5  6  7  8  9  10 11 12 13 14
             // 02 2E -- C9 05 F2 -- -- -- 01 01 FF == ** 03     아이템
             // 02 2E -- C9 05 F6 0F -- -- 02 01 01 -- == ** 03  아이템HQ
             // 02 2E 0E C9 02 FF __ ** 03                       사람
             // 02 2E 07 C9 07 FF __ ** 03                       ??? (NPC)
-
-
+            // 02 2E 03 ?? __ 03                                상용구
+            // 02 2E 04 ?? F0 __ 03
+            // 02 2E 05 ?? F2 __ __ 03
+            // 02 2E 06 ?? F6 __ __ __ 03
+            #endregion
+            
             byte[] arr = new byte[raw.Length];
             int arrPos = 0;
 
             byte v;
-            int len;
+            int len = 0;
             bool skipTo3 = false;
 
             int rawPos = index;
@@ -413,39 +464,68 @@ namespace FFChat
 
                 if (v == 2)
                 {
-                    switch (raw[rawPos + 4])
+                    v = raw[rawPos + 2];
+                    if (v == 3 || v == 4 || v == 5 || v == 6)
                     {
-                        case 0x05:
-                            if (raw[rawPos + 5] == 0xF2)
-                                rawPos += 12; // NQ
-                            else
-                                rawPos += 13; // HQ
+                        if (FFData.Table.ContainsKey(raw[rawPos + 3]))
+                        {
+                                 if (v == 3) len = (raw[rawPos + 4] - 1);
+                            else if (v == 4) len = (raw[rawPos + 5]);
+                            else if (v == 5) len = (raw[rawPos + 5] <<  8) | (raw[rawPos + 6]);
+                            else if (v == 6) len = (raw[rawPos + 5] << 16) | (raw[rawPos + 6] << 8) | (raw[rawPos + 7]);
 
-                            len = raw[rawPos] - 1;
-
-                            arr[arrPos++] = 0xE2;
-                            arr[arrPos++] = 0x96;
-                            arr[arrPos++] = 0xB6; // ▶
-                            Buffer.BlockCopy(raw, rawPos + 1, arr, arrPos, len);
-                            arrPos += len;
-                            break;
-
-                        case 0x02:
-                            rawPos += 6;
-                            len = raw[rawPos] - 1;
-
-                            Buffer.BlockCopy(raw, rawPos + 1, arr, arrPos, len);
-                            arrPos += len;
-                            break;
-
-                        case 0x07:
-                            arr[arrPos++] = 63; //?
-                            arr[arrPos++] = 63; //?
-                            arr[arrPos++] = 63; //?
-
-                            rawPos += 5;
-                            break;
+                            var dic = FFData.Table[raw[rawPos + 3]];
+                            if (dic.ContainsKey(len))
+                            {
+                                var bytes = dic[len];
+                                
+                                arr[arrPos++] = 0xE3;
+                                arr[arrPos++] = 0x80;
+                                arr[arrPos++] = 0x8A; // 《
+                                Buffer.BlockCopy(bytes, 0, arr, arrPos, bytes.Length);
+                                arrPos += bytes.Length;
+                                arr[arrPos++] = 0xE3;
+                                arr[arrPos++] = 0x80;
+                                arr[arrPos++] = 0x8B; // 》
+                            }
+                        }
                     }
+                    else
+                    {
+                        switch (raw[rawPos + 4])
+                        {
+                            case 0x05:
+                                if (raw[rawPos + 5] == 0xF2)
+                                    rawPos += 12; // NQ
+                                else
+                                    rawPos += 13; // HQ
+
+                                len = raw[rawPos] - 1;
+
+                                arr[arrPos++] = 0xE2;
+                                arr[arrPos++] = 0x96;
+                                arr[arrPos++] = 0xB6; // ▶
+                                Buffer.BlockCopy(raw, rawPos + 1, arr, arrPos, len);
+                                arrPos += len;
+                                break;
+
+                            case 0x02:
+                                rawPos += 6;
+                                len = raw[rawPos] - 1;
+
+                                Buffer.BlockCopy(raw, rawPos + 1, arr, arrPos, len);
+                                arrPos += len;
+                                break;
+
+                            case 0x07:
+                                arr[arrPos++] = 63; //?
+                                arr[arrPos++] = 63; //?
+                                arr[arrPos++] = 63; //?
+
+                                rawPos += 5;
+                                break;
+                        }
+                    }                    
 
                     skipTo3 = true;
                 }
