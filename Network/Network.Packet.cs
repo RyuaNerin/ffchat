@@ -44,7 +44,7 @@ namespace App
                     //TotalLength = (ushort)IPAddress.NetworkToHostOrder(BitConverter.ToInt16(buffer, 2));
                     //Identification = (ushort)IPAddress.NetworkToHostOrder(BitConverter.ToInt16(buffer, 4));
 
-                    ushort flagsAndOffset = (ushort)IPAddress.NetworkToHostOrder(BitConverter.ToInt16(buffer, 6));
+                    //ushort flagsAndOffset = (ushort)IPAddress.NetworkToHostOrder(BitConverter.ToInt16(buffer, 6));
                     //Flags = (byte)(flagsAndOffset >> 13);
                     //FragmentOffset = (ushort)(flagsAndOffset & 8191); // 0b1111111111111 = 8191
 

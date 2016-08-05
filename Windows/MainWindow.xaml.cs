@@ -1,10 +1,13 @@
 ﻿using System;
+using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Interop;
-using System.Windows.Media;
+using RyuaNerin;
 
 namespace FFChat.Windows
 {
@@ -38,11 +41,8 @@ namespace FFChat.Windows
         public static MainWindow Instance { get; private set; }
 
         private readonly NativeMethods.WinEventDelegate m_hookProc;
-        private readonly IntPtr m_hookHwnd;
-
         private readonly IntPtr m_handle;
-
-        private ScrollViewer m_scrollViewer;
+        private IntPtr m_hookHwnd;
 
         public MainWindow()
         {
@@ -55,7 +55,6 @@ namespace FFChat.Windows
             this.m_handle = helper.Handle;
             
             this.m_hookProc = new NativeMethods.WinEventDelegate(this.WinEventProc);
-            this.m_hookHwnd = NativeMethods.SetWinEventHook(NativeMethods.EVENT_SYSTEM_FOREGROUND, NativeMethods.EVENT_SYSTEM_FOREGROUND, IntPtr.Zero, this.m_hookProc, 0, 0, NativeMethods.WINEVENT_OUTOFCONTEXT | NativeMethods.WINEVENT_SKIPOWNPROCESS);
 
             this.ctlList.ItemsSource = Worker.ChatLog;
         }
@@ -71,18 +70,22 @@ namespace FFChat.Windows
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             Worker.Start();
+
+            Task.Factory.StartNew(() => {
+                var newVer = LastestRelease.CheckNewVersion("RyuaNerin", "ffchat");
+                if (newVer != null)
+                    this.Dispatcher.Invoke(new Action(() => {
+                        MessageBox.Show("새 버전이 출시되었어요!", "파판챗");
+                        Process.Start(new ProcessStartInfo { UseShellExecute = true, FileName = string.Format("\"{0}\"", newVer) }).Dispose();
+                        Application.Current.Shutdown();
+                    }));
+            });
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             NativeMethods.UnhookWinEvent(this.m_hookHwnd);
             Worker.Stop();
-        }
-
-        private void ctlList_MouseDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ChangedButton == MouseButton.Right)
-                Worker.SettingWindow.Show();
         }
 
         private bool m_isBottom = false;
@@ -93,8 +96,57 @@ namespace FFChat.Windows
 
         public void ScrollToBottom()
         {
-            if (m_isBottom)
+            if (this.m_isBottom)
                 this.ctlScroll.ScrollToBottom();
+        }
+
+        private void ctlTopMost_Checked(object sender, RoutedEventArgs e)
+        {
+            this.Topmost = true;
+            this.m_hookHwnd = NativeMethods.SetWinEventHook(NativeMethods.EVENT_SYSTEM_FOREGROUND, NativeMethods.EVENT_SYSTEM_FOREGROUND, IntPtr.Zero, this.m_hookProc, 0, 0, NativeMethods.WINEVENT_OUTOFCONTEXT | NativeMethods.WINEVENT_SKIPOWNPROCESS);
+        }
+
+        private void ctlTopMost_Unchecked(object sender, RoutedEventArgs e)
+        {
+            this.Topmost = false;
+            NativeMethods.UnhookWinEvent(this.m_hookHwnd);
+        }
+
+        private void ctlSetting_Click(object sender, RoutedEventArgs e)
+        {
+            Worker.SettingWindow.Show();
+        }
+
+        private void ctlSaveText_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.SaveFileDialog();
+            dlg.FileName = "파판챗";
+            dlg.DefaultExt = ".txt";
+            dlg.Filter = "텍스트 파일|*.txt"; // Filter files by extension
+
+            if (dlg.ShowDialog().GetValueOrDefault(false))
+            {
+                string filename = dlg.FileName;
+
+                lock (Worker.ChatLog)
+                {
+                    using (var file = new FileStream(dlg.FileName, FileMode.OpenOrCreate))
+                    {
+                        var writer = new StreamWriter(file, Encoding.UTF8);
+                        for (int i = 0; i < Worker.ChatLog.Count; ++i)
+                            writer.WriteLine(Worker.ChatLog[i].ChatBody);
+
+                        writer.Flush();
+                        file.Flush();
+                    }
+                }
+            }
+        }
+
+        private void ctlChatClear_Click(object sender, RoutedEventArgs e)
+        {
+            lock (Worker.ChatLog)
+                Worker.ChatLog.Clear();
         }
     }
 }

@@ -16,6 +16,7 @@ namespace RyuaNerin
             System.AppDomain.CurrentDomain.UnhandledException               += (s, e) => ShowCrashReport((Exception)e.ExceptionObject);
             System.Threading.Tasks.TaskScheduler.UnobservedTaskException    += (s, e) => ShowCrashReport(e.Exception);
             System.Windows.Application.Current.DispatcherUnhandledException += (s, e) => ShowCrashReport(e.Exception);
+            //System.Windows.Form.Application.ThreadException += (s, e) => ShowCrashReport(e.Exception);
 
             var asm = Assembly.GetExecutingAssembly();
             Version = asm.GetName().Version.ToString();
@@ -28,21 +29,17 @@ namespace RyuaNerin
 
         private static void ShowCrashReport(Exception exception)
         {
-            var date = DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss");
-            var file = string.Format("Crash-{0}.txt", date);
-
-            using (var writer = new StreamWriter(Path.Combine(ExeDir, file)))
-            {
-                writer.WriteLine("Decchi Crash Report");
-                writer.WriteLine("Date    : " + date);
-                writer.WriteLine("Version : " + Version);
-                writer.WriteLine();
-                writer.WriteLine("OS Ver  : " + GetOSInfomation());
-                writer.WriteLine("SPack   : " + NativeMethods.GetOSServicePack());
-                writer.WriteLine();
-                writer.WriteLine("Exception");
-                writer.WriteLine(exception.ToString());
-            }
+            Console.WriteLine("----------------------------------------");
+            Console.WriteLine("Crash Report");
+            Console.WriteLine("Date    : " + DateTime.Now.ToString());
+            Console.WriteLine("Version : " + Version);
+            Console.WriteLine();
+            Console.WriteLine("OS Ver  : " + GetOSInfomation());
+            Console.WriteLine("SPack   : " + NativeMethods.GetOSServicePack());
+            Console.WriteLine();
+            Console.WriteLine("Exception");
+            Console.WriteLine(exception.ToString());
+            Console.WriteLine("----------------------------------------");
         }
 
         private static string GetOSInfomation()

@@ -72,11 +72,12 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="RyuaNerin\LastestRelease.cs" />
     <Compile Include="Windows\FFChatApp.xaml.cs">
       <DependentUpon>FFChatApp.xaml</DependentUpon>
     </Compile>
     <Compile Include="Chat.cs" />
-    <Compile Include="ErrorTrace.cs" />
+    <Compile Include="RyuaNerin\ErrorTrace.cs" />
     <Compile Include="Windows\Converters\ForegroundConverter.cs" />
     <Compile Include="Windows\MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
