@@ -479,15 +479,14 @@ namespace FFChat
                             {
                                 var bytes = dic[len];
                                 
-                                arr[arrPos++] = 0xE3;
-                                arr[arrPos++] = 0x80;
-                                arr[arrPos++] = 0x8A; // 《
+                                arr[arrPos++] = 0x3E; // <
                                 Buffer.BlockCopy(bytes, 0, arr, arrPos, bytes.Length);
                                 arrPos += bytes.Length;
-                                arr[arrPos++] = 0xE3;
-                                arr[arrPos++] = 0x80;
-                                arr[arrPos++] = 0x8B; // 》
+                                arr[arrPos++] = 0x3C; // >
                             }
+
+                            rawPos += 2 + v;
+                            continue;
                         }
                     }
                     else
@@ -502,9 +501,7 @@ namespace FFChat
 
                                 len = raw[rawPos] - 1;
 
-                                arr[arrPos++] = 0xE2;
-                                arr[arrPos++] = 0x96;
-                                arr[arrPos++] = 0xB6; // ▶
+                                arr[arrPos++] = 0x3E; // >
                                 Buffer.BlockCopy(raw, rawPos + 1, arr, arrPos, len);
                                 arrPos += len;
                                 break;
