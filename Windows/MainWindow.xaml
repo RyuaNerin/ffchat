@@ -5,7 +5,6 @@
         Title="파판챗"
         Height="250"
         Width="450"
-        Topmost="True"
         Background="Black"
         Loaded="Window_Loaded"
         Closing="Window_Closing">

@@ -72,6 +72,7 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ChatParser.cs" />
     <Compile Include="FFData\action.cs" />
     <Compile Include="FFData\companion.cs" />
     <Compile Include="FFData\race.cs" />
