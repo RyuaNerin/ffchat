@@ -208,9 +208,15 @@ namespace FFChat
 
                             buff = FFData.Table[v][val];
 
-                            mem.WriteByte(0x3E); // <
+                            mem.WriteByte(0xE2);
+                            mem.WriteByte(0x96);
+                            mem.WriteByte(0xB6); // ▶
+
                             mem.Write(buff, 0, buff.Length);
-                            mem.WriteByte(0x3C); // >
+
+                            mem.WriteByte(0xE2);
+                            mem.WriteByte(0x97);
+                                    mem.WriteByte(0x80); // ◀
                             #endregion
                         }
                         else
@@ -242,11 +248,16 @@ namespace FFChat
                                     GetValue(raw, ref rawPos);
                                     GetValue(raw, ref rawPos);
                                     
-                                    /*
-                                    buff = FFData.Map[val];
-                                    mem.WriteByte(0x3C); // >
+                                    buff = FFData.PlaceName[FFData.Map[val]];
+                                    mem.WriteByte(0xE2);
+                                    mem.WriteByte(0x96);
+                                    mem.WriteByte(0xB6); // ▶
+
                                     mem.Write(buff, 0, buff.Length);
-                                    */
+
+                                    mem.WriteByte(0xE2);
+                                    mem.WriteByte(0x97);
+                                    mem.WriteByte(0x80); // ◀
 
                                     break;
                                 #endregion
@@ -311,9 +322,16 @@ namespace FFChat
                                     MovePos(raw, ref rawPos);
                                     rawPos += 3;
                                     val = GetValue(raw, ref rawPos);
-                                    
-                                    mem.WriteByte(0x3C); // >
+
+                                    mem.WriteByte(0xE2);
+                                    mem.WriteByte(0x96);
+                                    mem.WriteByte(0xB6); // ▶
+
                                     mem.Write(raw, rawPos, val);
+
+                                    mem.WriteByte(0xE2);
+                                    mem.WriteByte(0x97);
+                                    mem.WriteByte(0x80); // ◀
                                     break;
                                 #endregion
                             }
@@ -341,9 +359,9 @@ namespace FFChat
             var v = raw[index];
             int i = v;
 
-            if (v < 0xA0)
+            if (v < 0xF0)
             {
-                i = v;
+                i = v - 1;
                 index += 1;
             }
             else if (v == 0xF2)
@@ -363,7 +381,7 @@ namespace FFChat
             }
             else
             {
-                i = raw[index + 1] - 1;
+                i = raw[index + 1];
                 index += 2;
             }
 
@@ -373,7 +391,7 @@ namespace FFChat
         {
             var v = raw[index];
 
-            if (v < 0xA0)
+            if (v < 0xF0)
                 index += 1;
             else if (v == 0xF2)
                 index += 3;

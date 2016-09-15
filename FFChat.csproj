@@ -74,6 +74,7 @@
   <ItemGroup>
     <Compile Include="ChatParser.cs" />
     <Compile Include="FFData\action.cs" />
+    <Compile Include="FFData\map.cs" />
     <Compile Include="FFData\companion.cs" />
     <Compile Include="FFData\race.cs" />
     <Compile Include="FFData\textcommand.cs" />
@@ -139,7 +140,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

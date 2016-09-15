@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Media;
 using System.Threading;
 using System.Threading.Tasks;
 using App;
@@ -174,17 +175,12 @@ namespace FFChat
         {
             try
             {
-                if (message.Length < 1000)
-                    return;
+//                 if (message.Length < 1000)
+//                     return;
 
 #if DEBUG
                 Console.WriteLine(BitConverter.ToString(message).Replace("-", " "));
 #endif
-
-                // 47 인던 파티
-                // 64 귓속말
-                // 65 자유부대
-                // 67 외치기
 
                 var opcode = BitConverter.ToUInt16(message, 18);
                 if (opcode == 0x64 || opcode == 0x65 || opcode == 0x67)
@@ -207,6 +203,7 @@ namespace FFChat
 
                         switch (indexCode)
                         {
+                            case 0x00: return;          // 감정
                             case 0x0A: type = 0; break; // 말하기
                             case 0x1E: type = 1; break; // 떠들기
                             case 0x0B: type = 2; break; // 외치기
@@ -257,14 +254,6 @@ namespace FFChat
 
                         switch (indexCode)
                         {
-                            /*
-                            case 0x7A:
-                            case 0xA4:
-                            case 0xCD:
-                            case 0xE5:
-                            case 0xF9: fmt = Format_Party;
-                                       type = 4;  break; // 파티
-                            */
                             case 0xDC: type = 6;  break; // 부대
                             case 0x78: type = 7;  break; // 링1
                             case 0x7E: type = 8;  break; // 링2
@@ -274,6 +263,9 @@ namespace FFChat
                             case 0x84: type = 12; break; // 링6
                             case 0x85: type = 13; break; // 링7
                             case 0x86: type = 14; break; // 링8
+                            
+                            case 0x9F: return;
+
                             default:                     // 파티
                                 fmt = Format_Party;
                                 type = 4;
