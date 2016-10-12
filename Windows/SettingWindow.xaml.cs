@@ -1,5 +1,4 @@
 ﻿using System.Windows;
-using System.Windows.Controls;
 
 namespace FFChat.Windows
 {
@@ -14,18 +13,12 @@ namespace FFChat.Windows
 
         private void ctlSelect_Click(object sender, RoutedEventArgs e)
         {
-            Worker.SelectProcess(int.Parse(((string)this.ctlCombo.SelectedItem).Split(':')[1]));        
+            Worker.SelectFFXIVProcess(int.Parse(((string)this.ctlCombo.SelectedItem).Split(':')[1]));        
         }
 
         private void ctlReset_Click(object sender, RoutedEventArgs e)
         {
-            Worker.ResetProcess();
-        }
-
-        private void CheckBox_Click(object sender, RoutedEventArgs e)
-        {
-            var ctl = (CheckBox)sender;
-            Worker.SetVisible(int.Parse(ctl.Tag.ToString()), ctl.IsChecked.HasValue ? ctl.IsChecked.Value : false);
+            Worker.ResetFFXIVProcess();
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)

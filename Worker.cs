@@ -2,36 +2,55 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Media;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using App;
 using FFChat.Windows;
 
 namespace FFChat
 {
     internal static class Worker
     {
-        private const int MaxLog = 1024;
-        private const string MyName = "내 캐릭터";
+        // 3.15
+        private static readonly MemoryPattern SignatureX86 = new MemoryPattern(
+            false,
+            "**088b**********505152e8********a1",
+            new long[] { 0, 0x18, 0x2F0 },
+            new long[] { 0, 0x18, 0x2F4 },
+            new long[] { 0, 0x18, 0x2E0 },
+            new long[] { 0, 0x18, 0x2E4 }
+            );
+        private static readonly MemoryPattern SignatureX64 = new MemoryPattern(
+            true,
+            "e8********85c0740e488b0d********33D2E8********488b0d",
+            new long[] { 0, 0x30, 0x438 },
+            new long[] { 0, 0x30, 0x440 },
+            new long[] { 0, 0x30, 0x418 },
+            new long[] { 0, 0x30, 0x420 }
+            );
 
         public static readonly ObservableCollection<string> ProcessList = new ObservableCollection<string>();
         public static readonly ObservableCollection<Chat> ChatLog = new ObservableCollection<Chat>();
 
         private static readonly bool[] ShowingTypes = { true, true, true, true, true, true, true, true, true, true, true, true, true, true, true };
         
-        private static readonly Network m_network;
+        private static readonly ManualResetEvent m_work = new ManualResetEvent(false);
         private static Process m_ffxiv;
+        private static MemoryPattern m_pattern;
+        private static IntPtr m_ffxivHandle;
+        private static bool   m_isX64;
+        private static IntPtr m_basePtr;
+        private static IntPtr m_chatLog;
 
         public static readonly SettingWindow SettingWindow;
 
         static Worker()
         {
-            m_network = new Network();
             SettingWindow = new SettingWindow() { Owner = MainWindow.Instance };
         }
 
-        public static void Start()
+        public static void Initialize()
         {
             FindFFXIVProcess();
 
@@ -43,24 +62,14 @@ namespace FFChat
 
                     if ((m_ffxiv == null) || m_ffxiv.HasExited)
                     {
-                        m_ffxiv = null;
+                        ResetFFXIVProcess();
 
                         FFChatApp.Current.Dispatcher.Invoke(new Action(FindFFXIVProcess));
                     }
-                    else
-                    {
-                        // FFXIVProcess is alive
-                        if (m_network.IsRunning)
-                            m_network.UpdateGameConnections(m_ffxiv);
-                        else
-                            m_network.StartCapture(m_ffxiv);
-                    }
                 }
             });
-        }
-        public static void Stop()
-        {
-            m_network.StopCapture();
+
+            Task.Factory.StartNew(WorkerThread);
         }
 
         public static void FindFFXIVProcess()
@@ -103,30 +112,41 @@ namespace FFChat
             try
             {
                 m_ffxiv = process;
+                m_isX64 = !NativeMethods.IsX86Process(m_ffxiv.Handle);
+                //m_ffxivHandle = process.Handle;
+                m_ffxivHandle = NativeMethods.OpenProcess(0x00000010, false, m_ffxiv.Id);
 
-                var name = string.Format("{0}:{1}", m_ffxiv.ProcessName, m_ffxiv.Id);
-                Console.WriteLine("파이널판타지14 프로세스가 선택되었습니다: {0}", name);
+                m_pattern = m_isX64 ? SignatureX64 : SignatureX86;
+                m_basePtr = m_ffxiv.MainModule.BaseAddress;
+                m_chatLog = Scan(m_pattern.Pattern, 0, m_pattern.IsX64);
 
-                SettingWindow.ctlSelect.IsEnabled = false;
-                SettingWindow.ctlCombo.IsEnabled = false;
+                if (m_chatLog != IntPtr.Zero)
+                {
+                    m_work.Set();
 
-                ProcessList.Clear();
-                ProcessList.Add(name);
-                SettingWindow.ctlCombo.SelectedIndex = 0;
+                    var name = string.Format("{0}:{1}", m_ffxiv.ProcessName, m_ffxiv.Id);
+                    Console.WriteLine("파이널판타지14 프로세스가 선택되었습니다: {0}", name);
 
-                m_network.StartCapture(m_ffxiv);
+                    SettingWindow.ctlSelect.IsEnabled = false;
+                    SettingWindow.ctlCombo.IsEnabled = false;
+
+                    ProcessList.Clear();
+                    ProcessList.Add(name);
+                    SettingWindow.ctlCombo.SelectedIndex = 0;
+                }
             }
             catch
             {
             }
         }
 
-        public static void ResetProcess()
+        public static void ResetFFXIVProcess()
         {
             try
             {
-                m_network.StopCapture();
                 m_ffxiv = null;
+                m_work.Reset();
+
                 FindFFXIVProcess();
             }
             catch
@@ -134,7 +154,7 @@ namespace FFChat
             }
         }
 
-        public static void SelectProcess(int pid)
+        public static void SelectFFXIVProcess(int pid)
         {
             try
             {
@@ -145,177 +165,371 @@ namespace FFChat
                 Console.WriteLine("파이널판타지14 프로세스 설정에 실패했습니다");
             }
         }
-        
-        private static string[] TypeNames =
-        {
-            "말하기",
-            "떠들기",
-            "외치기",
-            "귓속말",
-            "파티",
-            "연합파티",
-            "자유부대",
-            "1",
-            "2",
-            "3",
-            "4",
-            "5",
-            "6",
-            "7",
-            "8"
-        };
 
-        private const string Format_Say    = "[{0:00}:{1:00}] {2}: {3}";
-        private const string Format_Tell_S = "[{0:00}:{1:00}] >>{2}: {3}";
-        private const string Format_Tell_R = "[{0:00}:{1:00}] {2} >> {3}";
-        private const string Format_Party  = "[{0:00}:{1:00}] ({2}) {3}";
-        private const string Format_Guild  = "[{0:00}:{1:00}] [{4}] <{2}> {3}";
-
-        public static void HandleMessage(byte[] message, bool sendMessage)
+        private static void WorkerThread()
         {
-            try
+            IntPtr start;
+            IntPtr end;
+            IntPtr lenStart;
+            IntPtr lenEnd;
+            
+            int[] buff = new int[0xfa0];
+            int num = 0;
+            //bool flag = true;
+            bool flag = false;
+            IntPtr zero = IntPtr.Zero;
+            IntPtr ptr2 = IntPtr.Zero;
+
+            int j;
+            int i;
+            int len;
+
+            var data = new List<byte[]>();
+
+            while (m_work.WaitOne())
             {
-//                 if (message.Length < 1000)
-//                     return;
+                start      = GetPointer(m_chatLog, m_pattern.ChatLogStart);
+                end        = GetPointer(m_chatLog, m_pattern.ChatLogEnd);
+                lenStart   = GetPointer(m_chatLog, m_pattern.ChatLogLenStart);
+                lenEnd     = GetPointer(m_chatLog, m_pattern.ChatLogLenEnd);
+                
+                if ((start == IntPtr.Zero || end == IntPtr.Zero) || (lenStart == IntPtr.Zero || lenEnd == IntPtr.Zero))
+                    Thread.Sleep(100);
 
-#if DEBUG
-                Console.WriteLine(BitConverter.ToString(message).Replace("-", " "));
-#endif
-
-                var opcode = BitConverter.ToUInt16(message, 18);
-                if (opcode == 0x64 || opcode == 0x65 || opcode == 0x67)
+                else if ((lenStart.ToInt64() + num * 4) == lenEnd.ToInt64())
                 {
-                    int indexCode = message[32];
+                    flag = false;
+                    Thread.Sleep(100);
+                }
+                else
+                {
+                    if (lenEnd.ToInt64() < lenStart.ToInt64())
+                        throw new ApplicationException("error with chat log - end len pointer is before beginning len pointer.");
 
-                    string fmt  = null;
-                    string name = null;
-                    string body = null;
-
-                    int type = 0;
-
-                    DateTime date = DateTime.Now;
-
-                    #region 말하기 떠들기 외치기
-                    if (opcode == 0x67)
+                    if (lenEnd.ToInt64() < (lenStart.ToInt64() + (num * 4)))
                     {
-                        if (sendMessage)
-                            indexCode = message[56];
-
-                        switch (indexCode)
+                        if ((zero != IntPtr.Zero) && (zero != IntPtr.Zero))
                         {
-                            case 0x00: return;          // 감정
-                            case 0x0A: type = 0; break; // 말하기
-                            case 0x1E: type = 1; break; // 떠들기
-                            case 0x0B: type = 2; break; // 외치기
+                            for (j = num; j < 0x3e8; j++)
+                            {
+                                buff[j] = ReadInt32(ptr2 + (j * 4));
+                                if (buff[j] > 0x100000)
+                                {
+                                    zero = IntPtr.Zero;
+                                    ptr2 = IntPtr.Zero;
+                                    throw new ApplicationException("Error with chat log - message length too long.");
+                                }
+                                int length = buff[j] - ((j == 0) ? 0 : buff[j - 1]);
+                                if (length != 0)
+                                {
+                                    byte[] message = ReadBytes(IntPtr.Add(start, j == 0 ? 0 : buff[j - 1]), length);
+                                    if (CheckMessage(message))
+                                        data.Add(message);
+                                }
+                            }
                         }
-                        if (!ShowingTypes[type]) return;
-                        
-                        date = new DateTime(1970, 1, 1, 0, 0, 0).AddSeconds(BitConverter.ToUInt32(message, 24)).ToLocalTime();
-
-                        fmt  = Format_Say;
-                        if (sendMessage)
-                        {
-                            name = MyName;
-                            body = ChatParser.GetString(message, 58);
-                        }
-                        else
-                        {
-                            name = ChatParser.GetString(message, 52);
-                            body = ChatParser.GetString(message, 84);
-                        }
+                        buff = new int[0xfa0];
+                        num = 0;
                     }
-                    #endregion
+                    zero = start;
+                    ptr2 = lenStart;
+                    if ((lenEnd.ToInt64() - lenStart.ToInt64()) > 0x100000L)
+                        throw new ApplicationException("Error with chat log - too much unread Len data (>100kb).");
 
-                    #region 귓속말
-                    else if (opcode == 0x64)
+                    if (((lenEnd.ToInt64() - lenStart.ToInt64()) % 4L) != 0L)
+                        throw new ApplicationException("Error with chat log - Log length array is invalid.");
+
+                    if ((lenEnd.ToInt64() - lenStart.ToInt64()) > 0xfa0L)
+                        throw new ApplicationException("Error with chat log - Log length array is too small.");
+
+                    len = (int)(lenEnd.ToInt64() - lenStart.ToInt64()) / 4;
+                    for (i = num; i < len; i++)
                     {
-                        type = 3;
-                        if (!ShowingTypes[type]) return;
-
-                        if (sendMessage)
-                        {
-                            fmt  = Format_Tell_S;
-                            name = ChatParser.GetString(message, 33);
-                            body = ChatParser.GetString(message, 65);
-                        }
-                        else
-                        {
-                            fmt  = Format_Tell_R;
-                            name = ChatParser.GetString(message, 41);
-                            body = ChatParser.GetString(message, 73);
-                        }
+                        buff[i] = ReadInt32(lenStart + (i * 4));
+                        byte[] message = ReadBytes(start + (i == 0 ? 0 : buff[i - 1]), buff[i] - (i == 0 ? 0 : buff[i - 1]));
+                        num++;
+                        if (!flag && CheckMessage(message))
+                            data.Add(message);
                     }
-                    #endregion
+                    flag = false;
 
-                    #region 부대 / 파티
-                    else if (opcode == 0x65)
+                    if (data.Count > 0)
                     {
-                        fmt = Format_Guild;
-
-                        switch (indexCode)
-                        {
-                            case 0xDC: type = 6;  break; // 부대
-                            case 0x78: type = 7;  break; // 링1
-                            case 0x7E: type = 8;  break; // 링2
-                            case 0x81: type = 9;  break; // 링3
-                            case 0x82: type = 10; break; // 링4
-                            case 0x83: type = 11; break; // 링5
-                            case 0x84: type = 12; break; // 링6
-                            case 0x85: type = 13; break; // 링7
-                            case 0x86: type = 14; break; // 링8
-                            
-                            case 0x9F: return;
-
-                            default:                     // 파티
-                                fmt = Format_Party;
-                                type = 4;
-                                break;
-                        }
-                        if (!ShowingTypes[type]) return;
-
-                        if (sendMessage)
-                        {
-                            name = MyName;
-                            body = ChatParser.GetString(message, 40);
-                        }
-                        else
-                        {
-                            name = ChatParser.GetString(message, 53);
-                            body = ChatParser.GetString(message, 85);
-                        }
+                        Task.Factory.StartNew(LogChatMessage, data.ToArray());
+                        data.Clear();
                     }
-                    #endregion
 
-                    if (string.IsNullOrWhiteSpace(body))
-                        return;
-
-                    var str = string.Format(fmt, date.Hour, date.Minute, name, body, TypeNames[type]);
-                    lock (ChatLog)
-                        FFChatApp.Current.Dispatcher.Invoke(new Action<Chat>(AddChatPriv), new Chat(type, str));
+                    Thread.Sleep(200);
                 }
             }
-            catch (IndexOutOfRangeException)
-            {
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("패킷 처리중 에러 발생함");
-                Console.WriteLine(ex);
-            }
+        }
+        
+        private static bool CheckMessage(byte[] rawData)
+        {
+            return ChatType.Types.ContainsKey(BitConverter.ToInt16(rawData, 4));
         }
 
-        private static void AddChatPriv(Chat chat)
+        private static void LogChatMessage(object arg)
         {
-            while (ChatLog.Count >= MaxLog)
-                ChatLog.RemoveAt(0);
-            ChatLog.Add(chat);
+            var rawData = (byte[][])arg;
+
+            if (rawData.Length == 0)
+                return;
+
+            var arr = new Chat[rawData.Length];
+            for (int i = 0; i < rawData.Length; ++i)
+                arr[i] = ParseChat(rawData[i]);
+
+            FFChatApp.Current.Dispatcher.Invoke(new Action<Chat[]>(AddChat), (object)arr);
+        }
+
+        private static readonly DateTime BaseTimeStamp = new DateTime(1970, 1, 1, 0, 0, 0);
+        private static Chat ParseChat(byte[] rawData)
+        {
+#if DEBUG
+            Console.WriteLine(BitConverter.ToString(rawData).Replace("-", " "));
+#endif
+            // Chat Type
+            var type = BitConverter.ToInt16(rawData, 4);
+            if (!ChatType.Types.ContainsKey(type))
+                return null;
+
+            // TimeStamp
+            var dateTime = BaseTimeStamp.AddSeconds(BitConverter.ToInt32(rawData, 0)).ToLocalTime();
+
+            // Nickname
+            int pos;
+            var nick = GetNick(rawData, 9, 0x3A, out pos); // ':' = 3A
+            var text = GetStr(rawData, pos, rawData.Length);
+
+            var typeObj = ChatType.Types[type];
+
+            return new Chat(typeObj, string.Format(typeObj.Format, dateTime.Hour, dateTime.Minute, nick, text, type - 0xF));
+        }
+        
+        private static void AddChat(Chat[] lst)
+        {
+            for (int i = 0; i < lst.Length; ++i)
+                if (lst[i] != null)
+                    ChatLog.Add(lst[i]);
 
             MainWindow.Instance.ScrollToBottom();
         }
 
-        public static void SetVisible(int index, bool value)
+        private static string GetNick(byte[] rawData, int index, int endByte, out int pos)
         {
-            ShowingTypes[index] = value;
+            int len = 0;
+            while (rawData[index + len] != endByte)
+                len++;
+
+            pos = index + len + 1;
+            return len > 0 ? GetStr(rawData, index, index + len) : null;
+        }
+
+        private static string GetStr(byte[] rawData, int index, int endIndex)
+        {
+            var buff = new byte[rawData.Length];
+            var bindex = 0;
+
+            byte v;
+            while (index < endIndex)
+            {
+                v = rawData[index++];
+
+                if (v == 2)
+                    index += rawData[index + 1] + 2;
+                else
+                    buff[bindex++] = v;
+            }
+
+            return bindex > 0 ? Encoding.UTF8.GetString(buff, 0, bindex) : null;
+        }
+
+        private static IntPtr Scan(string pattern, int offset, bool isX64)
+        {
+            var patArray = GetPatternArray(pattern);
+
+            int len = 0x1000;
+            byte[] buff = new byte[len];
+
+            IntPtr curPtr = m_ffxiv.MainModule.BaseAddress;
+            IntPtr maxPtr = IntPtr.Add(curPtr, m_ffxiv.MainModule.ModuleMemorySize);
+
+            int index;
+            IntPtr read = IntPtr.Zero;
+            IntPtr nSize = new IntPtr(len);
+
+            while (curPtr.ToInt64() < maxPtr.ToInt64())
+            {
+                try
+                {
+                    if ((curPtr + len).ToInt64() > maxPtr.ToInt64())
+                        nSize = new IntPtr(maxPtr.ToInt64() - curPtr.ToInt64());
+
+                    if (NativeMethods.ReadProcessMemory(m_ffxivHandle, curPtr, buff, nSize, ref read))
+                    {
+                        index = FindArray(buff, patArray, 0, read.ToInt32() - 3);
+
+                        if (index != -1)
+                        {
+                            IntPtr ptr;
+                            if (isX64)
+                            {
+                                ptr = new IntPtr(BitConverter.ToInt32(buff, index + patArray.Length));
+                                ptr = new IntPtr(curPtr.ToInt64() + index + patArray.Length + 4 + ptr.ToInt64());
+                            }
+                            else
+                            {
+                                ptr = new IntPtr(BitConverter.ToInt32(buff, index + patArray.Length));
+                                //ptr6 = new IntPtr(ptr6.ToInt64());
+                            }
+
+                            return ptr;
+                        }
+                    }
+                    curPtr += len;
+                }
+                catch (Exception exception)
+                {
+                    Console.WriteLine("ERROR: Cannot scan pointers.");
+                    Console.WriteLine(exception.Message);
+                    Console.WriteLine(exception.StackTrace.ToString());
+                }
+            }
+
+            return IntPtr.Zero;
+        }
+
+        private static byte?[] GetPatternArray(string pattern)
+        {
+            byte?[] arr = new byte?[pattern.Length / 2];
+
+            for (int i = 0; i < (pattern.Length / 2); i++)
+            {
+                string str = pattern.Substring(i * 2, 2);
+                if (str == "**")
+                    arr[i] = null;
+                else
+                    arr[i] = new byte?(Convert.ToByte(str, 0x10));
+            }
+
+            return arr;
+        }
+
+        private static int FindArray(byte[] buff, byte?[] pattern, int startIndex, int len)
+        {
+            len = Math.Min(buff.Length, len);
+
+            int i, j;
+            for (i = startIndex; i < (len - pattern.Length); i++)
+            {
+                for (j = 0; j < pattern.Length; j++)
+                    if (pattern[j].HasValue && buff[i + j] != pattern[j].Value)
+                        break;
+
+                if (j == pattern.Length)
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+        
+        private static IntPtr GetPointer(IntPtr sigPointer, long[] pointerTree)
+        {
+            if (pointerTree == null)
+                return IntPtr.Zero;
+
+            if (pointerTree.Length == 0)
+                return new IntPtr(sigPointer.ToInt64());
+
+            IntPtr ptr = new IntPtr(sigPointer.ToInt64());
+            for (int i = 0; i < pointerTree.Length; i++)
+            {
+                ptr = ReadPointer(new IntPtr(ptr.ToInt64() + pointerTree[i]));
+
+                if (ptr == IntPtr.Zero)
+                    return IntPtr.Zero;
+            }
+            return ptr;
+        }
+
+        private static IntPtr ReadPointer(IntPtr offset)
+        {
+            int num = m_isX64 ? 8 : 4;
+
+            byte[] lpBuffer = new byte[num];
+            IntPtr zero = IntPtr.Zero;
+            if (!NativeMethods.ReadProcessMemory(m_ffxivHandle, offset, lpBuffer, new IntPtr(num), ref zero))
+                return IntPtr.Zero;
+
+            if (m_isX64)
+                return new IntPtr(BitConverter.ToInt64(lpBuffer, 0));
+            else
+                return new IntPtr(BitConverter.ToInt32(lpBuffer, 0));
+        }
+
+        private static int ReadInt32(IntPtr offset)
+        {
+            byte[] lpBuffer = new byte[4];
+            IntPtr zero = IntPtr.Zero;
+            if (!NativeMethods.ReadProcessMemory(m_ffxivHandle, offset, lpBuffer, new IntPtr(4), ref zero))
+                return 0;
+
+            return BitConverter.ToInt32(lpBuffer, 0);
+        }
+
+        public static byte[] ReadBytes(IntPtr offset, int length)
+        {
+            IntPtr zero = IntPtr.Zero;
+            if ((length <= 0) || (length > 0x186a0))
+                return null;
+
+            if (offset == IntPtr.Zero)
+                return null;
+
+            byte[] lpBuffer = new byte[length];
+            NativeMethods.ReadProcessMemory(m_ffxivHandle, offset, lpBuffer, new IntPtr(length), ref zero);
+
+            return lpBuffer;
+        }
+        
+        private static class NativeMethods
+        {
+            [DllImport("kernel32.dll")]
+            public static extern bool ReadProcessMemory(
+                IntPtr hProcess,
+                IntPtr lpBaseAddress,
+                byte[] lpBuffer,
+                IntPtr nSize,
+                ref IntPtr lpNumberOfBytesRead);
+
+            [DllImport("kernel32.dll")]
+            public static extern IntPtr OpenProcess(
+                uint dwDesiredAccess,
+                [MarshalAs(UnmanagedType.Bool)]
+                bool bInheritHandle,
+                int dwProcessId);
+
+            [DllImport("kernel32.dll")]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            private static extern bool IsWow64Process(
+                [In]
+                IntPtr process,
+                [Out]
+                out bool wow64Process);
+
+            public static bool IsX86Process(IntPtr handle)
+            {
+                var OSVersion = Environment.OSVersion.Version;
+                if ((OSVersion.Major == 5 && OSVersion.Minor >= 1) || OSVersion.Major > 5)
+                {
+                    bool ret;
+                    return NativeMethods.IsWow64Process(handle, out ret) && ret;
+                }
+                return true;
+            }
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -6,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Interop;
 using RyuaNerin;
 
@@ -43,6 +45,8 @@ namespace FFChat.Windows
         private readonly NativeMethods.WinEventDelegate m_hookProc;
         private readonly IntPtr m_handle;
         private IntPtr m_hookHwnd;
+        
+        private readonly ICollectionView m_chat;
 
         public MainWindow()
         {
@@ -56,7 +60,11 @@ namespace FFChat.Windows
             
             this.m_hookProc = new NativeMethods.WinEventDelegate(this.WinEventProc);
 
-            this.ctlList.ItemsSource = Worker.ChatLog;
+            this.ctlFilter.ItemsSource = ChatType.Types.Values;
+            
+            this.m_chat = CollectionViewSource.GetDefaultView(Worker.ChatLog);
+            this.m_chat.Filter = (e) => ((Chat)e).ChatType.Visible;
+            this.ctlList.ItemsSource = m_chat;
         }
 
         private void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
@@ -66,26 +74,28 @@ namespace FFChat.Windows
 
             NativeMethods.SetWindowPos(this.m_handle, new IntPtr(NativeMethods.HWND_TOPMOST), 0, 0, 0, 0, NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE);
         }
-
+        
+#if !DEBUG
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            var newVer = await Task.Factory.StartNew(() => LastestRelease.CheckNewVersion("RyuaNerin", "ffchat"));
+            if (newVer != null)
+            {
+                MessageBox.Show("새 버전이 출시되었어요!", "파판챗");
+                Process.Start(new ProcessStartInfo { UseShellExecute = true, FileName = string.Format("\"{0}\"", newVer) }).Dispose();
+                Application.Current.Shutdown();
+                return;
+            }
+#else
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            Worker.Start();
-
-            Task.Factory.StartNew(() => {
-                var newVer = LastestRelease.CheckNewVersion("RyuaNerin", "ffchat");
-                if (newVer != null)
-                    this.Dispatcher.Invoke(new Action(() => {
-                        MessageBox.Show("새 버전이 출시되었어요!", "파판챗");
-                        Process.Start(new ProcessStartInfo { UseShellExecute = true, FileName = string.Format("\"{0}\"", newVer) }).Dispose();
-                        Application.Current.Shutdown();
-                    }));
-            });
+#endif
+            Worker.Initialize();
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             NativeMethods.UnhookWinEvent(this.m_hookHwnd);
-            Worker.Stop();
         }
 
         private bool m_isBottom = false;
@@ -134,7 +144,7 @@ namespace FFChat.Windows
                     {
                         var writer = new StreamWriter(file, Encoding.UTF8);
                         for (int i = 0; i < Worker.ChatLog.Count; ++i)
-                            writer.WriteLine(Worker.ChatLog[i].ChatBody);
+                            writer.WriteLine(Worker.ChatLog[i].Text);
 
                         writer.Flush();
                         file.Flush();
@@ -147,6 +157,20 @@ namespace FFChat.Windows
         {
             lock (Worker.ChatLog)
                 Worker.ChatLog.Clear();
+        }
+
+        private void ctlFilter_Checked(object sender, RoutedEventArgs e)
+        {
+            ((ChatType)(((Control)sender).Tag)).Visible = true;
+
+            this.m_chat.Refresh();
+        }
+
+        private void ctlFilter_Unchecked(object sender, RoutedEventArgs e)
+        {
+            ((ChatType)(((Control)sender).Tag)).Visible = false;
+            
+            this.m_chat.Refresh();
         }
     }
 }

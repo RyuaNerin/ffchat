@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 // 어셈블리와 관련된 정보를 수정하려면
 // 이 특성 값을 변경하십시오.
 [assembly: AssemblyTitle("FFChat")]
-[assembly: AssemblyDescription("파이널 판타지 14 채팅 오버레이")]
+[assembly: AssemblyDescription("파이널 판타지 14 채팅 스크래퍼")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("FFChat")]

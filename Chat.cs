@@ -1,17 +1,21 @@
-﻿namespace FFChat
+﻿using System.Windows.Media;
+
+namespace FFChat
 {
     internal class Chat
     {
-        public Chat(int index, string body)
+        public Chat(ChatType chatType, string text)
         {
-            this.m_chatIndex = index;
-            this.m_chatBody  = body;
+            this.m_type = chatType;
+            this.m_text = text;
         }
 
-        private readonly int m_chatIndex;
-        public int ChatIndex { get { return this.m_chatIndex; } }
+        private readonly ChatType m_type;
+        public ChatType ChatType { get { return this.m_type; } }
 
-        private readonly string m_chatBody;
-        public string ChatBody { get { return this.m_chatBody; } }
+        public Brush Brush { get { return this.m_type.Brush; } }
+
+        private readonly string m_text;
+        public string Text { get { return this.m_text; } }
     }
 }

@@ -34,14 +34,9 @@ namespace FFChat.Windows.Converters
             CreateBrushFromHtml("#d4ff7d"),
         };
 
-        private static Brush CreateBrushFromHtml(string code)
-        {
-            return new SolidColorBrush((Color)ColorConverter.ConvertFromString(code));
-        }
-
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            return brushes[(int)value];
+            return ChatType.FilterList[(int)value].Brush;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

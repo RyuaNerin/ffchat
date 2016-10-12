@@ -1,8 +1,7 @@
 ﻿<Window x:Class="FFChat.Windows.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:converters="clr-namespace:FFChat.Windows.Converters"
-        Title="파판챗"
+        Title="파판14 채팅 스크래퍼"
         Height="250"
         Width="450"
         Background="Black"
@@ -10,8 +9,6 @@
         Closing="Window_Closing">
     <Window.Resources>
         <ResourceDictionary>
-            <converters:ForegroundConverter x:Key="ForegroundConverter" />
-            
             <ContextMenu x:Key="ContextMenu">
                 <MenuItem Header="맨 위로"
                           IsCheckable="True"
@@ -23,29 +20,53 @@
                 <MenuItem Header="텍스트로 저장"
                           Click="ctlSaveText_Click" />
                 <Separator />
-                <MenuItem Header="설정"
-                            Click="ctlSetting_Click" />
+                <MenuItem Header="프로세스 설정"
+                          Click="ctlSetting_Click" />
             </ContextMenu>
         </ResourceDictionary>
     </Window.Resources>
-    <ScrollViewer x:Name="ctlScroll"
-                  Background="Black"
-                  VerticalScrollBarVisibility="Visible"
-                  ContextMenu="{StaticResource ContextMenu}"
-                  ScrollChanged="ctlScroll_ScrollChanged">
-        <ItemsControl x:Name="ctlList"
-                      Margin="3"
-                      ContextMenu="{StaticResource ContextMenu}">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="auto" />
+            <ColumnDefinition />
+        </Grid.ColumnDefinitions>
+        <ItemsControl x:Name="ctlFilter"
+                      Background="Black"
+                      BorderThickness="0"
+                      Margin="5"
+                      ScrollViewer.VerticalScrollBarVisibility="Auto">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <TextBlock Text="{Binding Path=ChatBody}"
-                               Foreground="{Binding Path=ChatIndex, Converter={StaticResource ForegroundConverter}}"
-                               HorizontalAlignment="Stretch"
-                               TextWrapping="Wrap"
-                               LineStackingStrategy="BlockLineHeight"
-                               ContextMenu="{StaticResource ContextMenu}" />
+                    <CheckBox Content="{Binding Path=Desc}"
+                              Tag="{Binding}"
+                              IsChecked="True"
+                              Margin="0 0 0 2"
+                              Foreground="White"
+                              Checked="ctlFilter_Checked"
+                              Unchecked="ctlFilter_Unchecked" />
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
-    </ScrollViewer>
+        <ScrollViewer Grid.Column="1"
+                      x:Name="ctlScroll"
+                      Background="Black"
+                      VerticalScrollBarVisibility="Visible"
+                      ContextMenu="{StaticResource ContextMenu}"
+                      ScrollChanged="ctlScroll_ScrollChanged">
+            <ItemsControl x:Name="ctlList"
+                          Margin="3"
+                          ContextMenu="{StaticResource ContextMenu}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Path=Text}"
+                                   Foreground="{Binding Path=Brush}"
+                                   HorizontalAlignment="Stretch"
+                                   TextWrapping="Wrap"
+                                   LineStackingStrategy="BlockLineHeight"
+                                   ContextMenu="{StaticResource ContextMenu}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
 </Window>
